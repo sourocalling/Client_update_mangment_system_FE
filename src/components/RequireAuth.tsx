@@ -17,22 +17,18 @@ export function RequireAuth({
 
   useEffect(() => {
     if (!isReady) return;
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
+    if (!user) return; // proxy.ts handles redirect to /login
     if (allow && !allow.includes(user.role)) {
       router.replace("/dashboard");
     }
   }, [allow, isReady, router, user]);
 
-  if (!isReady) {
+  if (!isReady || !user) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10 text-sm text-slate-600">Loading…</div>
     );
   }
 
-  if (!user) return null;
   if (allow && !allow.includes(user.role)) return null;
 
   return <>{children}</>;

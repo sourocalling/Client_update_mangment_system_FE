@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 function Icon({
   name,
@@ -145,6 +146,14 @@ export function Nav() {
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleLogout = useCallback(() => {
+    setShowLogoutConfirm(false);
+    setIsMobileOpen(false);
+    logout();
+    router.push("/login");
+  }, [logout, router]);
 
   const links = useMemo(() => {
     if (!user) return [];
@@ -190,10 +199,7 @@ export function Nav() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  logout();
-                  router.push("/login");
-                }}
+                onClick={() => setShowLogoutConfirm(true)}
                 className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 md:inline-flex"
               >
                 <Icon name="logout" />
@@ -243,10 +249,7 @@ export function Nav() {
 
             <button
               type="button"
-              onClick={() => {
-                logout();
-                router.push("/login");
-              }}
+              onClick={() => setShowLogoutConfirm(true)}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
             >
               <Icon name="logout" />
@@ -255,6 +258,17 @@ export function Nav() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={showLogoutConfirm}
+        title="Logout"
+        description="You are about to end your session."
+        confirmLabel="Logout"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </header>
   );
 }

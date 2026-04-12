@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/Card";
 import { Field, InlineMessage } from "@/components/ui/Field";
 import { Select, TextInput } from "@/components/ui/Inputs";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { EditUpdateModal } from "@/components/EditUpdateModal";
 import { cn } from "@/lib/cn";
 
 type SortBy = "createdAt" | "hours" | "title";
@@ -256,6 +258,11 @@ function DashboardInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UpdateRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editTarget, setEditTarget] = useState<UpdateRow | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -296,7 +303,7 @@ function DashboardInner() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : "load_failed"))
       .finally(() => setIsLoading(false));
-  }, [accessToken, authorId, from, page, pageSize, projectId, q, riskOnly, sortBy, sortDir, to]);
+  }, [accessToken, authorId, from, page, pageSize, projectId, q, refreshKey, riskOnly, sortBy, sortDir, to]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const title =
@@ -336,6 +343,54 @@ function DashboardInner() {
       );
     });
   };
+
+  const canModify = useCallback(
+    (row: UpdateRow) => {
+      if (!user) return false;
+      if (user.role === "PM" || user.role === "TL") return true;
+      return row.authorId === user.id;
+    },
+    [user]
+  );
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget || !accessToken) return;
+    setIsDeleting(true);
+    try {
+      await apiFetch(`/api/updates/${deleteTarget.id}`, {
+        method: "DELETE",
+        token: accessToken
+      });
+      setItems((prev) => prev.filter((u) => u.id !== deleteTarget.id));
+      setTotal((prev) => prev - 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "delete_failed");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget, accessToken]);
+
+  const handleEditSave = useCallback(
+    async (id: string, payload: Record<string, unknown>) => {
+      if (!accessToken) return;
+      setIsSaving(true);
+      try {
+        await apiFetch(`/api/updates/${id}`, {
+          method: "PUT",
+          token: accessToken,
+          body: payload
+        });
+        setEditTarget(null);
+        setRefreshKey((k) => k + 1);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "update_failed");
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [accessToken]
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -580,12 +635,13 @@ function DashboardInner() {
               </th>
               <th className="px-5 py-3.5 text-center">Risk</th>
               <th className="px-5 py-3.5 text-center">Feedback</th>
+              <th className="px-5 py-3.5 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-5 py-12 text-center">
+                <td colSpan={8} className="px-5 py-12 text-center">
                   <div className="inline-flex items-center gap-2 text-sm text-slate-500">
                     <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -597,7 +653,7 @@ function DashboardInner() {
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-500">
+                <td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-500">
                   No updates found.
                 </td>
               </tr>
@@ -728,6 +784,39 @@ function DashboardInner() {
                         </button>
                       </div>
                     </td>
+
+                    {/* Actions */}
+                    <td className="px-5 py-4 text-center">
+                      {canModify(u) && (
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditTarget(u)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                            title="Edit update"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h8M16.5 3.5l4 4L8 20H4v-4L16.5 3.5z" />
+                            </svg>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(u)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+                            title="Delete update"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })
@@ -738,6 +827,31 @@ function DashboardInner() {
 
       {/* ── Image lightbox ── */}
       {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
+
+      {/* ── Edit modal ── */}
+      <EditUpdateModal
+        open={editTarget !== null}
+        update={editTarget}
+        projects={projects}
+        isSaving={isSaving}
+        onSave={handleEditSave}
+        onCancel={() => setEditTarget(null)}
+      />
+
+      {/* ── Delete confirmation ── */}
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete Update"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" by ${deleteTarget.authorName} will be permanently removed.`
+            : undefined
+        }
+        confirmLabel={isDeleting ? "Deleting..." : "Delete"}
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

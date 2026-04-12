@@ -6,6 +6,14 @@ import { apiFetch } from "@/lib/api";
 
 const storageKey = "cums_access_token";
 
+function setTokenCookie(token: string) {
+  document.cookie = `${storageKey}=${encodeURIComponent(token)}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+}
+
+function clearTokenCookie() {
+  document.cookie = `${storageKey}=; path=/; max-age=0`;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -13,7 +21,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null;
-    if (token) setAccessToken(token);
+    if (token) {
+      setAccessToken(token);
+      setTokenCookie(token);
+    }
     setIsReady(true);
   }, []);
 
@@ -33,6 +44,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
     refreshMe(accessToken).catch(() => {
       window.localStorage.removeItem(storageKey);
+      clearTokenCookie();
       setAccessToken(null);
       setUser(null);
     });
@@ -44,12 +56,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
       body: { tenant: "Acme", email, password }
     });
     window.localStorage.setItem(storageKey, res.accessToken);
+    setTokenCookie(res.accessToken);
     setAccessToken(res.accessToken);
     setUser(res.user);
   }, []);
 
   const logout = useCallback(() => {
     window.localStorage.removeItem(storageKey);
+    clearTokenCookie();
     setAccessToken(null);
     setUser(null);
   }, []);
