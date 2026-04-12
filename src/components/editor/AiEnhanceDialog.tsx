@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EnhanceResponse } from "@/types/shared";
-import { apiFetch } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -29,46 +28,61 @@ export function AiEnhanceDialog({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<EnhanceResponse | null>(null);
   const [baseBody, setBaseBody] = useState("");
-  const hasAutoRunRef = useRef(false);
-  const requestSeqRef = useRef(0);
+
+  const onResultRef = useRef(onResult);
+  onResultRef.current = onResult;
+  const abortRef = useRef<AbortController | null>(null);
+  const isLoadingRef = useRef(false);
 
   const run = useCallback(
     async (overrideBody?: string, overrideMode?: "grammar" | "style" | "expand") => {
       const requestBody = (overrideBody ?? baseBody).trim();
       const requestMode = overrideMode ?? mode;
       if (!requestBody) return;
-      if (isLoading) return;
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       if (overrideBody !== undefined) setBaseBody(overrideBody);
-    const seq = (requestSeqRef.current += 1);
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch<EnhanceResponse>("/api/enhance", {
-        method: "POST",
-        token,
-        body: { body: requestBody, mode: requestMode }
-      });
-      if (seq !== requestSeqRef.current) return;
-      setResult(res);
-      onResult(res);
-    } catch (e) {
-      if (seq !== requestSeqRef.current) return;
-      setError(e instanceof Error ? e.message : "enhance_failed");
-    } finally {
-      if (seq !== requestSeqRef.current) return;
-      setIsLoading(false);
-    }
+      isLoadingRef.current = true;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const resp = await fetch("/api/enhance", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ body: requestBody, mode: requestMode }),
+          signal: controller.signal
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ error: "enhance_failed" }));
+          throw new Error((err as { error?: string }).error ?? "enhance_failed");
+        }
+        const res = (await resp.json()) as EnhanceResponse;
+        if (controller.signal.aborted) return;
+        setResult(res);
+        onResultRef.current(res);
+      } catch (e) {
+        if (controller.signal.aborted) return;
+        setError(e instanceof Error ? e.message : "enhance_failed");
+      } finally {
+        if (controller.signal.aborted) return;
+        isLoadingRef.current = false;
+        setIsLoading(false);
+      }
     },
-    [baseBody, isLoading, mode, onResult, token]
+    [baseBody, mode, token]
   );
 
   useEffect(() => {
     if (!open) {
-      hasAutoRunRef.current = false;
+      abortRef.current?.abort();
+      isLoadingRef.current = false;
+      setIsLoading(false);
       return;
     }
-    if (hasAutoRunRef.current) return;
-    hasAutoRunRef.current = true;
+    if (isLoadingRef.current) return;
     setResult(null);
     setError(null);
     setMode("style");

@@ -18,6 +18,14 @@ import { AiEnhanceDialog } from "@/components/editor/AiEnhanceDialog";
 
 const MAX_BODY_CHARS = 8000;
 
+const BLOCKER_KEYWORDS = /\b(block(?:ed|er|ers|age|ing)|stuck|stalled|impediment|delay(?:ed)?|waiting\s+(?:on|for)|can(?:'|no)t\s+proceed|depend(?:ency|encies)\s+issue|at\s+risk)\b/gi;
+
+function detectBlockerKeywords(text: string): string[] {
+  const matches = text.match(BLOCKER_KEYWORDS);
+  if (!matches) return [];
+  return [...new Set(matches.map((m) => m.toLowerCase()))];
+}
+
 const FormSchema = z.object({
   title: z.string().min(1).max(200),
   projectId: z.string().uuid(),
@@ -106,6 +114,16 @@ function SubmitPageInner() {
   });
 
   const originalBody = useWatch({ control: form.control, name: "originalBody" }) ?? "";
+  const blockersChecked = useWatch({ control: form.control, name: "blockers" });
+
+  const detectedKeywords = useMemo(() => detectBlockerKeywords(originalBody), [originalBody]);
+  const blockersRequired = detectedKeywords.length > 0 || enhanceState.risk === true;
+
+  useEffect(() => {
+    if (blockersRequired && !blockersChecked) {
+      form.setValue("blockers", true, { shouldValidate: true });
+    }
+  }, [blockersRequired, blockersChecked, form]);
 
   const canEnhance = Boolean(originalBody?.trim()) && !form.formState.isSubmitting;
 
@@ -139,22 +157,10 @@ function SubmitPageInner() {
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <Badge variant="neutral">Daily update</Badge>
-              <CardTitle className="mt-3 text-2xl">Developer Update</CardTitle>
-              <CardDescription>Write once. The dashboard stays current for your TL and PM.</CardDescription>
-            </div>
-            <Button
-              type="button"
-              variant="primary"
-              leftIcon={<Icon name="sparkle" />}
-              onClick={() => setIsAiOpen(true)}
-              disabled={!canEnhance}
-              className="bg-indigo-600 hover:bg-indigo-700 focus-visible:ring-indigo-600"
-            >
-              Enhance with AI
-            </Button>
+          <div>
+            <Badge variant="neutral">Daily update</Badge>
+            <CardTitle className="mt-3 text-2xl">Developer Update</CardTitle>
+            <CardDescription>Write once. The dashboard stays current for your TL and PM.</CardDescription>
           </div>
 
           {enhanceState.error ? (
@@ -199,6 +205,13 @@ function SubmitPageInner() {
             className="grid gap-5"
             onSubmit={form.handleSubmit(async (values) => {
               if (!accessToken) return;
+              const keywords = detectBlockerKeywords(values.originalBody);
+              if ((keywords.length > 0 || enhanceState.risk) && !values.blockers) {
+                form.setError("blockers", {
+                  message: "Your update mentions blockers — please acknowledge before submitting."
+                });
+                return;
+              }
               setSubmitSuccess(null);
               const res = await apiFetch<{ id: string }>("/api/updates", {
                 method: "POST",
@@ -290,17 +303,42 @@ function SubmitPageInner() {
               </Field>
             </div>
 
-            <InlineMessage variant="info" className="flex items-start gap-3">
+            <InlineMessage
+              variant={blockersRequired ? "warning" : "info"}
+              className="flex items-start gap-3"
+            >
               <input
                 type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
+                className={`mt-1 h-4 w-4 rounded border-slate-300 focus:ring-slate-900/20 ${
+                  blockersRequired
+                    ? "text-amber-600 cursor-not-allowed"
+                    : "text-slate-900"
+                }`}
                 {...form.register("blockers")}
+                disabled={blockersRequired}
               />
               <div className="min-w-0">
-                <div className="font-semibold text-slate-900">Has blockers</div>
-                <div className="mt-0.5 text-xs text-slate-600">
-                  Use this when you’re waiting on another team, an environment, or a dependency.
+                <div className="font-semibold text-slate-900">
+                  Has blockers
+                  {blockersRequired ? (
+                    <span className="ml-2 text-xs font-medium text-amber-700">Required</span>
+                  ) : null}
                 </div>
+                {blockersRequired ? (
+                  <div className="mt-0.5 text-xs text-amber-700">
+                    Your update contains blocker-related keywords
+                    {detectedKeywords.length > 0 ? (
+                      <>
+                        {" ("}<span className="font-semibold">{detectedKeywords.join(", ")}</span>{") "}
+                      </>
+                    ) : null}
+                    — this field is mandatory.
+                  </div>
+                ) : (
+                  <div className="mt-0.5 text-xs text-slate-600">
+                    Use this when you’re waiting on another team, an environment, or a dependency.
+                  </div>
+                )}
               </div>
             </InlineMessage>
 
