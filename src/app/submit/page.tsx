@@ -6,15 +6,22 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RequireAuth } from "@/components/RequireAuth";
 import { apiFetch, apiUpload } from "@/lib/api";
-import type { Project } from "@/types/shared";
 import { useAuth } from "@/lib/auth";
+import {
+  fetchGitlabProjects,
+  useGitlabConnection,
+  type GitlabProject
+} from "@/lib/gitlab";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardDescription, CardTitle } from "@/components/ui/Card";
 import { Field, InlineMessage } from "@/components/ui/Field";
-import { Select, TextInput } from "@/components/ui/Inputs";
+import { TextInput } from "@/components/ui/Inputs";
 import { MarkdownComposer } from "@/components/editor/MarkdownComposer";
 import { AiEnhanceDialog } from "@/components/editor/AiEnhanceDialog";
+import { GitlabConnectModal } from "@/components/GitlabConnectModal";
+import { GitlabProjectPicker } from "@/components/GitlabProjectPicker";
+import { GitlabCommitsPicker } from "@/components/GitlabCommitsPicker";
 
 const MAX_BODY_CHARS = 8000;
 
@@ -28,7 +35,7 @@ function detectBlockerKeywords(text: string): string[] {
 
 const FormSchema = z.object({
   title: z.string().min(1).max(200),
-  projectId: z.string().uuid(),
+  projectId: z.string().min(1, "Pick a project"),
   originalBody: z.string().min(1).max(MAX_BODY_CHARS),
   hours: z.number().min(0).max(24),
   nextPlan: z.string().min(1).max(500),
@@ -89,7 +96,10 @@ function Icon({ name, className }: { name: "sparkle" | "check" | "warn"; classNa
 
 function SubmitPageInner() {
   const { accessToken } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { connection: gitlab } = useGitlabConnection();
+  const [gitlabProjects, setGitlabProjects] = useState<GitlabProject[]>([]);
+  const [isLoadingGitlab, setIsLoadingGitlab] = useState(false);
+  const [gitlabError, setGitlabError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [enhanceState, setEnhanceState] = useState<{
     risk: boolean | null;
@@ -99,6 +109,7 @@ function SubmitPageInner() {
     error: string | null;
   }>({ risk: null, riskKeywords: [], inappropriate: null, inappropriateKeywords: [], error: null });
   const [isAiOpen, setIsAiOpen] = useState(false);
+  const [isGitlabModalOpen, setIsGitlabModalOpen] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
@@ -115,6 +126,23 @@ function SubmitPageInner() {
 
   const originalBody = useWatch({ control: form.control, name: "originalBody" }) ?? "";
   const blockersChecked = useWatch({ control: form.control, name: "blockers" });
+  const projectIdValue = useWatch({ control: form.control, name: "projectId" }) ?? "";
+
+  const selectedGitlabProject = useMemo(() => {
+    if (!projectIdValue.startsWith("gitlab:")) return null;
+    const id = Number(projectIdValue.slice("gitlab:".length));
+    if (!Number.isFinite(id)) return null;
+    return gitlabProjects.find((p) => p.id === id) ?? null;
+  }, [projectIdValue, gitlabProjects]);
+
+  const insertGitlabCommits = useCallback(
+    (markdown: string) => {
+      const current = form.getValues("originalBody") ?? "";
+      const next = current.trim().length > 0 ? `${current}\n\n${markdown}\n` : `${markdown}\n`;
+      form.setValue("originalBody", next, { shouldDirty: true, shouldValidate: true });
+    },
+    [form]
+  );
 
   const detectedKeywords = useMemo(() => detectBlockerKeywords(originalBody), [originalBody]);
   const blockersRequired = detectedKeywords.length > 0 || enhanceState.risk === true;
@@ -150,11 +178,24 @@ function SubmitPageInner() {
   );
 
   useEffect(() => {
-    if (!accessToken) return;
-    apiFetch<{ projects: Project[] }>("/api/projects", { token: accessToken })
-      .then((res) => setProjects(res.projects))
-      .catch(() => setProjects([]));
-  }, [accessToken]);
+    if (!gitlab) {
+      setGitlabProjects([]);
+      setGitlabError(null);
+      return;
+    }
+    const controller = new AbortController();
+    setIsLoadingGitlab(true);
+    setGitlabError(null);
+    fetchGitlabProjects(gitlab.url, gitlab.token, controller.signal)
+      .then((res) => setGitlabProjects(res))
+      .catch((e) => {
+        if (e instanceof Error && e.name === "AbortError") return;
+        setGitlabError(e instanceof Error ? e.message : "gitlab_error");
+        setGitlabProjects([]);
+      })
+      .finally(() => setIsLoadingGitlab(false));
+    return () => controller.abort();
+  }, [gitlab]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:py-12 animate-fade-in-up">
@@ -168,7 +209,7 @@ function SubmitPageInner() {
               Daily update
             </Badge>
             <CardTitle className="mt-3 text-[28px] sm:text-[32px]">
-              <span className="gradient-text">Developer Update</span>
+              <span className="text-slate-900">Developer Update</span>
             </CardTitle>
             <CardDescription className="max-w-xl">
               Write once. The dashboard stays current for your TL and PM — with AI-enhanced clarity and instant risk signals.
@@ -247,6 +288,42 @@ function SubmitPageInner() {
               </InlineMessage>
             ) : null}
 
+            {!gitlab ? (
+              <div className="relative overflow-hidden rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 ring-1 ring-inset ring-orange-100">
+                      <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+                        <path d="M12 21 3 12l2.3-7.1h3l2.4 7.1H13l2.4-7.1h3L20.9 12 12 21z" fill="#FC6D26" />
+                        <path d="M12 21 8.7 12H15.3L12 21z" fill="#E24329" />
+                        <path d="M12 21 3 12h5.7L12 21z" fill="#FCA326" />
+                        <path d="m3 12 2.3-7.1L8.7 12H3z" fill="#E24329" />
+                        <path d="M12 21 21 12h-5.7L12 21z" fill="#FCA326" />
+                        <path d="m21 12-2.3-7.1L15.3 12H21z" fill="#E24329" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-semibold tracking-tight text-slate-900">
+                        Connect your GitLab workspace
+                      </div>
+                      <div className="mt-1 text-[12px] leading-5 text-slate-600">
+                        Sign in once to load your repositories, browse commits by branch and date, and attach them directly to your daily update.
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setIsGitlabModalOpen(true)}
+                  >
+                    Connect GitLab
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Title"
@@ -258,19 +335,44 @@ function SubmitPageInner() {
 
               <Field
                 label="Project"
-                hint="Used for dashboard filters and reporting."
-                error={form.formState.errors.projectId?.message}
+                hint={
+                  gitlab
+                    ? isLoadingGitlab
+                      ? "Loading GitLab projects…"
+                      : `GitLab · ${gitlabProjects.length} project${gitlabProjects.length === 1 ? "" : "s"}`
+                    : "Connect GitLab to load your projects"
+                }
+                error={form.formState.errors.projectId?.message ?? gitlabError ?? undefined}
               >
-                <Select {...form.register("projectId")}>
-                  <option value="">Select a project…</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </Select>
+                <Controller
+                  control={form.control}
+                  name="projectId"
+                  render={({ field }) => (
+                    <GitlabProjectPicker
+                      value={field.value}
+                      onChange={(v) => field.onChange(v)}
+                      projects={gitlabProjects}
+                      disabled={!gitlab || isLoadingGitlab}
+                      isLoading={isLoadingGitlab}
+                      placeholder={
+                        gitlab ? "Select a GitLab project…" : "Connect GitLab to load projects…"
+                      }
+                    />
+                  )}
+                />
               </Field>
             </div>
+
+            {gitlab && selectedGitlabProject ? (
+              <GitlabCommitsPicker
+                projectId={selectedGitlabProject.id}
+                projectName={selectedGitlabProject.name_with_namespace}
+                gitlabUrl={gitlab.url}
+                gitlabToken={gitlab.token}
+                currentUserEmail={gitlab.user.email}
+                onInsert={insertGitlabCommits}
+              />
+            ) : null}
 
             <Field
               label="Update details"
@@ -284,7 +386,7 @@ function SubmitPageInner() {
                   leftIcon={<Icon name="sparkle" />}
                   onClick={() => setIsAiOpen(true)}
                   disabled={!canEnhance}
-                  className="text-indigo-700 hover:bg-indigo-50 focus-visible:ring-indigo-600"
+                  className="text-sky-700 hover:bg-sky-50 focus-visible:ring-sky-600"
                 >
                   Enhance
                 </Button>
@@ -391,6 +493,11 @@ function SubmitPageInner() {
           }}
         />
       ) : null}
+
+      <GitlabConnectModal
+        open={isGitlabModalOpen}
+        onClose={() => setIsGitlabModalOpen(false)}
+      />
     </div>
   );
 }

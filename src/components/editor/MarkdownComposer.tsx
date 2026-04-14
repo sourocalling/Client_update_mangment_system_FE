@@ -591,7 +591,7 @@ function renderInline(text: string): React.ReactNode {
             href={url}
             target={url.startsWith("/") ? undefined : "_blank"}
             rel={url.startsWith("/") ? undefined : "noreferrer"}
-            className="font-semibold text-indigo-700 underline underline-offset-2"
+            className="font-semibold text-sky-700 underline underline-offset-2"
           >
             {label}
           </a>

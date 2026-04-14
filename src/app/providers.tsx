@@ -5,6 +5,7 @@ import { AuthContext, type AuthState, type AuthUser, type RegisterInput } from "
 import { apiFetch } from "@/lib/api";
 
 const storageKey = "cums_access_token";
+const tenantKey = "cums_tenant";
 
 function setTokenCookie(token: string) {
   document.cookie = `${storageKey}=${encodeURIComponent(token)}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
@@ -12,6 +13,11 @@ function setTokenCookie(token: string) {
 
 function clearTokenCookie() {
   document.cookie = `${storageKey}=; path=/; max-age=0`;
+}
+
+function readStoredTenant(): string {
+  if (typeof window === "undefined") return "Acme";
+  return window.localStorage.getItem(tenantKey) || "Acme";
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -50,12 +56,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     });
   }, [accessToken, isReady, refreshMe]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, tenant?: string) => {
+    const resolvedTenant = tenant?.trim() || readStoredTenant();
     const res = await apiFetch<{ accessToken: string; user: AuthUser }>("/api/auth/login", {
       method: "POST",
-      body: { tenant: "Acme", email, password }
+      body: { tenant: resolvedTenant, email, password }
     });
     window.localStorage.setItem(storageKey, res.accessToken);
+    window.localStorage.setItem(tenantKey, resolvedTenant);
     setTokenCookie(res.accessToken);
     setAccessToken(res.accessToken);
     setUser(res.user);
@@ -67,6 +75,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       body: input
     });
     window.localStorage.setItem(storageKey, res.accessToken);
+    window.localStorage.setItem(tenantKey, input.tenant);
     setTokenCookie(res.accessToken);
     setAccessToken(res.accessToken);
     setUser(res.user);

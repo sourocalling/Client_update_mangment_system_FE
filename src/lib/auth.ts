@@ -25,7 +25,7 @@ export type AuthState = {
   isReady: boolean;
   user: AuthUser | null;
   accessToken: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, tenant?: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
 };

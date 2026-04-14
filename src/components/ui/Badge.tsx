@@ -20,7 +20,7 @@ export function Badge({
         variant === "success" && "bg-emerald-50 text-emerald-700 ring-emerald-200/80",
         variant === "danger" && "bg-rose-50 text-rose-700 ring-rose-200/80",
         variant === "warning" && "bg-amber-50 text-amber-800 ring-amber-200/80",
-        variant === "brand" && "bg-indigo-50 text-indigo-700 ring-indigo-200/80",
+        variant === "brand" && "bg-sky-50 text-sky-700 ring-sky-200/80",
         className
       )}
     />

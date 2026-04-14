@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { Field, InlineMessage } from "@/components/ui/Field";
 import { TextInput } from "@/components/ui/Inputs";
+import { Logo } from "@/components/Logo";
 import type { Role } from "@/types/shared";
 
 const RoleSchema = z.enum(["DEV", "TL", "PM", "AM"]);
@@ -69,18 +70,20 @@ export default function SignupPage() {
     <div className="relative overflow-hidden">
       {/* Ambient decorative blobs */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-indigo-400/20 blur-3xl animate-float-slow" />
-        <div className="absolute -right-24 top-40 h-[24rem] w-[24rem] rounded-full bg-fuchsia-400/15 blur-3xl animate-float-slow" style={{ animationDelay: "-3s" }} />
+        <div className="absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-sky-300/25 blur-3xl animate-float-slow" />
+        <div className="absolute -right-24 top-40 h-[24rem] w-[24rem] rounded-full bg-cyan-200/30 blur-3xl animate-float-slow" style={{ animationDelay: "-3s" }} />
         <div className="absolute bottom-0 left-1/3 h-[22rem] w-[22rem] rounded-full bg-cyan-400/15 blur-3xl animate-float-slow" style={{ animationDelay: "-6s" }} />
       </div>
 
       <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-20">
         {/* Left: hero */}
         <div className="relative animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm backdrop-blur-md">
+          <Logo variant="full" className="h-10 w-auto" />
+
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-sky-100 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-500" />
             </span>
             <span className="tracking-wide uppercase">Create account</span>
             <span className="mx-1 h-3 w-px bg-slate-300" />
@@ -89,7 +92,7 @@ export default function SignupPage() {
 
           <h1 className="mt-6 text-4xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-[52px]">
             Join your team&apos;s <br />
-            <span className="gradient-text">daily update flow.</span>
+            <span className="text-sky-700">daily update flow.</span>
           </h1>
 
           <p className="mt-5 max-w-xl text-[15px] leading-7 text-slate-600">
@@ -103,9 +106,9 @@ export default function SignupPage() {
             {ROLE_OPTIONS.map((opt) => (
               <div
                 key={opt.value}
-                className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-white/60 bg-white/75 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_30px_-18px_rgba(30,27,75,0.2)] backdrop-blur-md transition-all duration-300 hover:-translate-y-[2px] hover:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_20px_40px_-18px_rgba(79,70,229,0.35)]"
+                className="group relative flex items-center gap-4 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-[2px] hover:border-sky-300 hover:shadow-[0_14px_32px_-18px_rgba(2,132,199,0.35)]"
               >
-                <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#4f46e5,#7c3aed,#c026d3)] text-[11px] font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_-10px_rgba(79,70,229,0.5)]">
+                <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-[11px] font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_-12px_rgba(2,132,199,0.55)]">
                   {opt.value}
                 </div>
                 <div className="min-w-0">
@@ -130,26 +133,9 @@ export default function SignupPage() {
 
         {/* Right: Auth card */}
         <div className="relative animate-fade-in-up" style={{ animationDelay: "120ms" }}>
-          <div
-            aria-hidden
-            className="absolute -inset-4 -z-10 rounded-[2rem] bg-[linear-gradient(135deg,rgba(99,102,241,0.25),rgba(217,70,239,0.15),rgba(6,182,212,0.2))] blur-2xl"
-          />
-
-          <div className="relative overflow-hidden rounded-[22px] border border-white/60 bg-white/90 p-1 shadow-[0_40px_90px_-30px_rgba(49,46,129,0.4)] backdrop-blur-xl">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-[22px]"
-              style={{
-                background: "linear-gradient(135deg, rgba(99,102,241,0.3), rgba(217,70,239,0.2), rgba(6,182,212,0.25))",
-                mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-                WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-                WebkitMaskComposite: "xor",
-                maskComposite: "exclude",
-                padding: "1px"
-              }}
-            />
-
-            <div className="relative rounded-[20px] bg-white/95 px-7 py-8 sm:px-9 sm:py-10">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_56px_-24px_rgba(15,23,42,0.18)]">
+            <div className="h-1 w-full bg-gradient-to-r from-sky-500 via-sky-400 to-cyan-400" />
+            <div className="relative px-7 py-8 sm:px-9 sm:py-10">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-[22px] font-semibold tracking-tight text-slate-900">
@@ -159,7 +145,7 @@ export default function SignupPage() {
                     Takes less than a minute. No credit card required.
                   </p>
                 </div>
-                <div className="rounded-xl bg-[linear-gradient(135deg,#4f46e5,#7c3aed,#c026d3)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_-10px_rgba(124,58,237,0.6)]">
+                <div className="rounded-lg bg-sky-600 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_-10px_rgba(2,132,199,0.6)]">
                   Sign up
                 </div>
               </div>
@@ -172,7 +158,7 @@ export default function SignupPage() {
                     const squadName = values.squadName?.trim();
                     await registerUser({
                       tenant: values.tenant.trim(),
-                      email: values.email.trim(),
+                      email: values.email.trim().toLowerCase(),
                       password: values.password,
                       name: values.name.trim(),
                       role: values.role,
@@ -236,8 +222,8 @@ export default function SignupPage() {
                           className={
                             "group relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border px-3 py-3 text-center transition-all duration-200 " +
                             (active
-                              ? "border-indigo-400 bg-indigo-50/80 shadow-[0_10px_24px_-16px_rgba(79,70,229,0.6)]"
-                              : "border-slate-200/80 bg-white/70 hover:-translate-y-[1px] hover:border-indigo-300 hover:bg-white")
+                              ? "border-sky-500 bg-sky-50/80 shadow-[0_10px_24px_-16px_rgba(2,132,199,0.55)]"
+                              : "border-slate-200 bg-white hover:-translate-y-[1px] hover:border-sky-300 hover:bg-sky-50/40")
                           }
                         >
                           <input
@@ -250,8 +236,8 @@ export default function SignupPage() {
                             className={
                               "rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset " +
                               (active
-                                ? "bg-indigo-600 text-white ring-indigo-600"
-                                : "bg-indigo-50 text-indigo-700 ring-indigo-200/80")
+                                ? "bg-sky-600 text-white ring-sky-600"
+                                : "bg-sky-50 text-sky-700 ring-sky-200/80")
                             }
                           >
                             {opt.value}
@@ -315,7 +301,7 @@ export default function SignupPage() {
 
               <Link
                 href="/login"
-                className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2.5 text-center text-[13px] font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-[1px] hover:border-indigo-300 hover:bg-white hover:text-indigo-700 hover:shadow-[0_10px_24px_-14px_rgba(79,70,229,0.35)]"
+                className="mt-4 flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-center text-[13px] font-semibold text-slate-700 transition-all duration-200 hover:border-sky-300 hover:bg-sky-50/60 hover:text-sky-800 hover:shadow-[0_10px_24px_-14px_rgba(2,132,199,0.3)]"
               >
                 Sign in to your account
                 <svg

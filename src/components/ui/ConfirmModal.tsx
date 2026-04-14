@@ -142,9 +142,9 @@ const DANGER = {
 };
 
 const PRIMARY = {
-  iconBg: "bg-indigo-50 ring-1 ring-indigo-100",
+  iconBg: "bg-sky-50 ring-1 ring-sky-100",
   iconInner:
-    "bg-[linear-gradient(135deg,#4f46e5_0%,#7c3aed_55%,#c026d3_100%)] text-white shadow-[0_8px_18px_-8px_rgba(79,70,229,0.55)]",
+    "bg-sky-600 text-white shadow-[0_8px_18px_-10px_rgba(2,132,199,0.55)]",
   icon: (
     <svg
       className="h-[18px] w-[18px]"

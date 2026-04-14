@@ -138,7 +138,7 @@ export function EditUpdateModal({
               size="sm"
               onClick={() => setIsAiOpen(true)}
               disabled={!originalBody.trim() || isSaving}
-              className="text-indigo-700 hover:bg-indigo-50 focus-visible:ring-indigo-600"
+              className="text-sky-700 hover:bg-sky-50 focus-visible:ring-sky-600"
               leftIcon={
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M12 2l1.4 5.1L18 9l-4.6 1.9L12 16l-1.4-5.1L6 9l4.6-1.9L12 2z" />

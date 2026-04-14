@@ -5,6 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { Logo } from "@/components/Logo";
+import { GitlabConnectModal } from "@/components/GitlabConnectModal";
+import { useGitlabConnection } from "@/lib/gitlab";
 
 function Icon({
   name,
@@ -109,16 +112,16 @@ function NavLink({
   return (
     <Link
       href={href}
-      className={`group relative inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-semibold tracking-tight outline-none transition-all duration-200 ${
+      className={`group relative inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-semibold tracking-tight outline-none transition-all duration-200 ${
         isActive
-          ? "bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-[0_10px_24px_-12px_rgba(124,58,237,0.55)]"
-          : "text-slate-600 hover:bg-slate-900/[0.05] hover:text-slate-900"
-      } focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2`}
+          ? "bg-sky-600 text-white shadow-[0_8px_22px_-12px_rgba(2,132,199,0.55)]"
+          : "text-slate-600 hover:bg-sky-50 hover:text-sky-800"
+      } focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2`}
       aria-current={isActive ? "page" : undefined}
     >
       <Icon
         name={icon}
-        className={isActive ? "text-white" : "text-slate-500 group-hover:text-slate-700"}
+        className={isActive ? "text-white" : "text-slate-500 group-hover:text-sky-700"}
       />
       {label}
     </Link>
@@ -127,10 +130,12 @@ function NavLink({
 
 export function Nav() {
   const { user, logout } = useAuth();
+  const { connection: gitlab } = useGitlabConnection();
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showGitlabModal, setShowGitlabModal] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   const handleLogout = useCallback(() => {
@@ -166,31 +171,20 @@ export function Nav() {
     <header
       className={`sticky top-0 z-40 transition-all duration-300 ${
         scrolled
-          ? "border-b border-slate-200/70 bg-white/75 backdrop-blur-xl shadow-[0_8px_28px_-18px_rgba(30,27,75,0.3)]"
-          : "border-b border-transparent bg-white/40 backdrop-blur-md"
+          ? "border-b border-slate-200 bg-white/90 backdrop-blur-xl shadow-[0_6px_20px_-14px_rgba(15,23,42,0.18)]"
+          : "border-b border-transparent bg-white/70 backdrop-blur-md"
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         {/* Logo */}
         <Link
           href="/"
-          className="group inline-flex items-center gap-2.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="group inline-flex items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
         >
-          <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#4f46e5_0%,#7c3aed_55%,#c026d3_100%)] text-white shadow-[0_10px_24px_-10px_rgba(124,58,237,0.6)] transition-transform duration-300 group-hover:scale-[1.04]">
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-              style={{
-                background:
-                  "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.55), transparent 60%)"
-              }}
-            />
-            <Icon name="sparkle" className="h-[18px] w-[18px] text-white drop-shadow-sm" />
-          </span>
-          <div className="leading-tight">
-            <div className="text-[15px] font-semibold tracking-tight text-slate-900">
-              Client<span className="gradient-text">Portal</span>
-            </div>
+          <Logo variant="full" className="h-8 w-auto transition-transform duration-300 group-hover:scale-[1.03]" />
+          <span className="hidden h-5 w-px bg-slate-200 sm:inline-block" />
+          <div className="hidden leading-tight sm:block">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Client Portal</div>
             <div className="text-[11px] font-medium text-slate-500">Always up to date</div>
           </div>
         </Link>
@@ -206,20 +200,45 @@ export function Nav() {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <div className="hidden items-center gap-2.5 rounded-full border border-slate-200/80 bg-white/85 px-3 py-1.5 text-xs shadow-sm backdrop-blur-sm sm:flex">
+              <div className="hidden items-center gap-2.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-sm sm:flex">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
                 <span className="font-semibold text-slate-800">{user.name}</span>
-                <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700 ring-1 ring-inset ring-indigo-200/80">
+                <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700 ring-1 ring-inset ring-sky-200/80">
                   {user.role}
                 </span>
               </div>
               <button
                 type="button"
+                onClick={() => setShowGitlabModal(true)}
+                className={
+                  "hidden h-10 items-center gap-2 rounded-lg border px-3.5 text-[13px] font-semibold shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 md:inline-flex " +
+                  (gitlab
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700")
+                }
+                title={gitlab ? `Connected as @${gitlab.user.username}` : "Connect GitLab"}
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                  <path d="M12 21 3 12l2.3-7.1h3l2.4 7.1H13l2.4-7.1h3L20.9 12 12 21z" fill="#FC6D26" />
+                  <path d="M12 21 8.7 12H15.3L12 21z" fill="#E24329" />
+                  <path d="M12 21 3 12h5.7L12 21z" fill="#FCA326" />
+                  <path d="m3 12 2.3-7.1L8.7 12H3z" fill="#E24329" />
+                  <path d="M12 21 21 12h-5.7L12 21z" fill="#FCA326" />
+                  <path d="m21 12-2.3-7.1L15.3 12H21z" fill="#E24329" />
+                </svg>
+                {gitlab ? (
+                  <span className="max-w-[120px] truncate">@{gitlab.user.username}</span>
+                ) : (
+                  <span>Connect GitLab</span>
+                )}
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowLogoutConfirm(true)}
-                className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200/80 bg-white/85 px-3.5 text-[13px] font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-[1px] hover:border-slate-300 hover:bg-white hover:shadow-md focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 md:inline-flex"
+                className="hidden h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 md:inline-flex"
               >
                 <Icon name="logout" />
                 Logout
@@ -233,7 +252,7 @@ export function Nav() {
             <button
               type="button"
               onClick={() => setIsMobileOpen((v) => !v)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/85 text-slate-700 shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-white focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 md:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition-all duration-200 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 md:hidden"
               aria-label={isMobileOpen ? "Close menu" : "Open menu"}
               aria-expanded={isMobileOpen}
             >
@@ -246,17 +265,17 @@ export function Nav() {
       {/* Mobile panel */}
       {user ? (
         <div
-          className={`md:hidden overflow-hidden border-t border-slate-200/70 bg-white/90 backdrop-blur-xl transition-all duration-300 ${
+          className={`md:hidden overflow-hidden border-t border-slate-200 bg-white/95 backdrop-blur-xl transition-all duration-300 ${
             isMobileOpen ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
           }`}
         >
           <div className="mx-auto max-w-6xl space-y-3 px-4 py-4">
-            <div className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-gradient-to-br from-indigo-50 via-violet-50 to-fuchsia-50 px-4 py-3">
+            <div className="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-slate-900">{user.name}</div>
                 <div className="truncate text-xs text-slate-600">{user.email}</div>
               </div>
-              <div className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-700 shadow-sm ring-1 ring-inset ring-indigo-200">
+              <div className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-sky-700 shadow-sm ring-1 ring-inset ring-sky-200">
                 {user.role}
               </div>
             </div>
@@ -269,8 +288,32 @@ export function Nav() {
 
             <button
               type="button"
+              onClick={() => {
+                setIsMobileOpen(false);
+                setShowGitlabModal(true);
+              }}
+              className={
+                "inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold shadow-sm transition focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 " +
+                (gitlab
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700")
+              }
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                <path d="M12 21 3 12l2.3-7.1h3l2.4 7.1H13l2.4-7.1h3L20.9 12 12 21z" fill="#FC6D26" />
+                <path d="M12 21 8.7 12H15.3L12 21z" fill="#E24329" />
+                <path d="M12 21 3 12h5.7L12 21z" fill="#FCA326" />
+                <path d="m3 12 2.3-7.1L8.7 12H3z" fill="#E24329" />
+                <path d="M12 21 21 12h-5.7L12 21z" fill="#FCA326" />
+                <path d="m21 12-2.3-7.1L15.3 12H21z" fill="#E24329" />
+              </svg>
+              {gitlab ? `GitLab · @${gitlab.user.username}` : "Connect GitLab"}
+            </button>
+
+            <button
+              type="button"
               onClick={() => setShowLogoutConfirm(true)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
             >
               <Icon name="logout" />
               Logout
@@ -289,6 +332,8 @@ export function Nav() {
         onConfirm={handleLogout}
         onCancel={() => setShowLogoutConfirm(false)}
       />
+
+      <GitlabConnectModal open={showGitlabModal} onClose={() => setShowGitlabModal(false)} />
     </header>
   );
 }

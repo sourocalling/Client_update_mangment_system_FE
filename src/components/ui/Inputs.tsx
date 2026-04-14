@@ -5,11 +5,11 @@ import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes 
 import { cn } from "@/lib/cn";
 
 const base =
-  "w-full rounded-xl border border-slate-200/80 bg-white/85 px-3.5 py-2.5 text-sm text-slate-900 " +
+  "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 " +
   "outline-none transition-[border-color,box-shadow,background] duration-200 " +
   "placeholder:text-slate-400 " +
   "hover:border-slate-300 " +
-  "focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 " +
+  "focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-500/10 " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
 export function TextInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {

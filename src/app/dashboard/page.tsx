@@ -101,7 +101,7 @@ function renderInline(text: string): React.ReactNode {
           href={match[2]}
           target="_blank"
           rel="noreferrer"
-          className="text-indigo-600 underline underline-offset-2 hover:text-indigo-800"
+          className="text-sky-700 underline underline-offset-2 hover:text-sky-800"
         >
           {match[1]}
         </a>
@@ -222,7 +222,7 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
 function SortIcon({ dir }: { dir: SortDir | null }) {
   if (!dir) return null;
   return (
-    <svg className="ml-1 inline h-3 w-3 text-indigo-500" viewBox="0 0 12 12" fill="currentColor">
+    <svg className="ml-1 inline h-3 w-3 text-sky-600" viewBox="0 0 12 12" fill="currentColor">
       {dir === "asc" ? <path d="M6 2L10 8H2L6 2Z" /> : <path d="M6 10L2 4H10L6 10Z" />}
     </svg>
   );
@@ -443,7 +443,7 @@ function DashboardInner() {
             Dashboard
           </Badge>
           <CardTitle className="mt-3 text-[28px] sm:text-[32px]">
-            <span className="gradient-text">{title}</span>
+            <span className="text-slate-900">{title}</span>
           </CardTitle>
           <CardDescription className="max-w-xl">
             Filter, search, and export updates with minimal effort. Everything you need, always up to date.
@@ -467,7 +467,7 @@ function DashboardInner() {
         <StatCard
           label="Total visible"
           value={total}
-          accent="from-indigo-500 to-violet-500"
+          accent="from-sky-500 to-sky-600"
           icon={
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
@@ -478,7 +478,7 @@ function DashboardInner() {
         <StatCard
           label="On this page"
           value={items.length}
-          accent="from-violet-500 to-fuchsia-500"
+          accent="from-cyan-500 to-sky-500"
           icon={
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" />
