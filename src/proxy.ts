@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 const cookieKey = "cums_access_token";
 
-const publicRoutes = ["/login"];
+const publicRoutes = ["/login", "/signup"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

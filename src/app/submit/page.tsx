@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RequireAuth } from "@/components/RequireAuth";
-import { apiFetch, getApiBaseUrl } from "@/lib/api";
+import { apiFetch, apiUpload } from "@/lib/api";
 import type { Project } from "@/types/shared";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
@@ -127,24 +127,27 @@ function SubmitPageInner() {
 
   const canEnhance = Boolean(originalBody?.trim()) && !form.formState.isSubmitting;
 
-  const uploadImage = useMemo(() => {
-    return async (file: File) => {
-      if (!accessToken) throw new Error("missing_auth");
+  const uploadImage = useCallback(
+    async (file: File) => {
+      if (!accessToken) throw new Error("unauthorized");
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${getApiBaseUrl()}/api/uploads/image`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${accessToken}` },
-        body: formData
+      return apiUpload<{ url: string }>("/api/uploads/image", formData, { token: accessToken });
+    },
+    [accessToken]
+  );
+
+  const deleteImage = useCallback(
+    async (url: string) => {
+      if (!accessToken) throw new Error("unauthorized");
+      await apiFetch<{ ok: boolean; path: string }>("/api/uploads/image", {
+        method: "DELETE",
+        token: accessToken,
+        body: { url }
       });
-      if (!res.ok) throw new Error("upload_failed");
-      const data = (await res.json()) as { url: string };
-      if (data.url.startsWith("/")) {
-        return { url: `${getApiBaseUrl()}${data.url}` };
-      }
-      return data;
-    };
-  }, [accessToken]);
+    },
+    [accessToken]
+  );
 
   useEffect(() => {
     if (!accessToken) return;
@@ -154,13 +157,22 @@ function SubmitPageInner() {
   }, [accessToken]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
+    <div className="mx-auto max-w-5xl px-4 py-8 sm:py-12 animate-fade-in-up">
       <Card>
         <CardHeader>
           <div>
-            <Badge variant="neutral">Daily update</Badge>
-            <CardTitle className="mt-3 text-2xl">Developer Update</CardTitle>
-            <CardDescription>Write once. The dashboard stays current for your TL and PM.</CardDescription>
+            <Badge variant="brand">
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h8M16.5 3.5l4 4L8 20H4v-4L16.5 3.5z" />
+              </svg>
+              Daily update
+            </Badge>
+            <CardTitle className="mt-3 text-[28px] sm:text-[32px]">
+              <span className="gradient-text">Developer Update</span>
+            </CardTitle>
+            <CardDescription className="max-w-xl">
+              Write once. The dashboard stays current for your TL and PM — with AI-enhanced clarity and instant risk signals.
+            </CardDescription>
           </div>
 
           {enhanceState.error ? (
@@ -288,6 +300,7 @@ function SubmitPageInner() {
                     placeholder="- What you completed today\n- What’s next\n- Any risks / blockers"
                     maxChars={MAX_BODY_CHARS}
                     onUploadImage={uploadImage}
+                    onDeleteImage={deleteImage}
                     disabled={form.formState.isSubmitting}
                   />
                 )}

@@ -4,7 +4,33 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
-type Size = "sm" | "md";
+type Size = "sm" | "md" | "lg";
+
+const VARIANTS: Record<Variant, string> = {
+  primary:
+    "text-white bg-[linear-gradient(135deg,#4f46e5_0%,#7c3aed_55%,#c026d3_100%)] " +
+    "shadow-[0_10px_30px_-12px_rgba(79,70,229,0.55)] " +
+    "hover:-translate-y-[1px] hover:shadow-[0_18px_44px_-16px_rgba(79,70,229,0.6)] " +
+    "active:translate-y-0 active:shadow-[0_6px_16px_-8px_rgba(79,70,229,0.5)]",
+  secondary:
+    "border border-slate-200/90 bg-white/80 text-slate-800 backdrop-blur-sm " +
+    "shadow-[0_1px_2px_rgba(15,23,42,0.04)] " +
+    "hover:-translate-y-[1px] hover:border-slate-300 hover:bg-white hover:shadow-[0_10px_24px_-14px_rgba(30,27,75,0.25)] " +
+    "active:translate-y-0",
+  ghost:
+    "text-slate-700 hover:bg-slate-900/[0.05] hover:text-slate-900 active:bg-slate-900/[0.08]",
+  danger:
+    "text-white bg-[linear-gradient(135deg,#ef4444_0%,#dc2626_100%)] " +
+    "shadow-[0_10px_30px_-12px_rgba(220,38,38,0.55)] " +
+    "hover:-translate-y-[1px] hover:shadow-[0_18px_44px_-16px_rgba(220,38,38,0.6)] " +
+    "active:translate-y-0"
+};
+
+const SIZES: Record<Size, string> = {
+  sm: "h-9 px-3.5 text-[13px]",
+  md: "h-10 px-4 text-sm",
+  lg: "h-12 px-6 text-[15px]"
+};
 
 export function Button({
   variant = "primary",
@@ -28,23 +54,30 @@ export function Button({
       {...props}
       disabled={disabled || isLoading}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold shadow-sm transition",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2",
-        size === "sm" ? "px-3 py-2 text-sm" : "px-4 py-2.5 text-sm",
-        variant === "primary" &&
-          "bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60",
-        variant === "secondary" &&
-          "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-60",
-        variant === "ghost" &&
-          "bg-transparent text-slate-700 hover:bg-slate-100 disabled:opacity-60 shadow-none",
-        variant === "danger" &&
-          "bg-red-600 text-white hover:bg-red-700 disabled:opacity-60",
+        "group/btn relative inline-flex items-center justify-center gap-2 rounded-xl font-semibold tracking-tight " +
+          "transition-[transform,box-shadow,background,color] duration-200 ease-out " +
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white " +
+          "disabled:cursor-not-allowed disabled:opacity-60",
+        SIZES[size],
+        VARIANTS[variant],
         className
       )}
     >
-      {isLoading ? <Spinner /> : leftIcon}
-      <span>{children}</span>
-      {rightIcon}
+      {/* Shimmer highlight on primary/danger */}
+      {(variant === "primary" || variant === "danger") && !disabled && !isLoading ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl"
+        >
+          <span className="absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent transition-all duration-700 ease-out group-hover/btn:left-[120%]" />
+        </span>
+      ) : null}
+
+      <span className="relative inline-flex items-center gap-2">
+        {isLoading ? <Spinner /> : leftIcon}
+        <span>{children}</span>
+        {rightIcon}
+      </span>
     </button>
   );
 }
@@ -69,4 +102,3 @@ function Spinner() {
     </svg>
   );
 }
-

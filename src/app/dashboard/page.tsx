@@ -222,9 +222,48 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
 function SortIcon({ dir }: { dir: SortDir | null }) {
   if (!dir) return null;
   return (
-    <svg className="ml-1 inline h-3 w-3 text-slate-400" viewBox="0 0 12 12" fill="currentColor">
+    <svg className="ml-1 inline h-3 w-3 text-indigo-500" viewBox="0 0 12 12" fill="currentColor">
       {dir === "asc" ? <path d="M6 2L10 8H2L6 2Z" /> : <path d="M6 10L2 4H10L6 10Z" />}
     </svg>
+  );
+}
+
+/* ── Stat card ─────────────────────────────────────────── */
+
+function StatCard({
+  label,
+  value,
+  icon,
+  accent,
+  trailing
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  accent: string;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white/85 p-5 backdrop-blur-xl shadow-[0_1px_3px_rgba(15,23,42,0.04),0_16px_40px_-22px_rgba(30,27,75,0.2)] transition-all duration-300 hover:-translate-y-[2px] hover:shadow-[0_1px_3px_rgba(15,23,42,0.05),0_24px_48px_-22px_rgba(79,70,229,0.35)]">
+      <div
+        aria-hidden
+        className={`absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br ${accent} opacity-[0.08] blur-2xl transition-opacity duration-300 group-hover:opacity-[0.16]`}
+      />
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <span className={`inline-flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br ${accent} text-white shadow-sm`}>
+              {icon}
+            </span>
+            {label}
+          </div>
+          <div className="mt-3 text-[28px] font-bold tracking-tight text-slate-900">
+            {value}
+          </div>
+        </div>
+        {trailing}
+      </div>
+    </div>
   );
 }
 
@@ -232,7 +271,7 @@ function SortIcon({ dir }: { dir: SortDir | null }) {
 
 export default function DashboardPage() {
   return (
-    <RequireAuth allow={["DEV", "TL", "PM"]}>
+    <RequireAuth allow={["DEV", "TL", "PM", "AM"]}>
       <DashboardInner />
     </RequireAuth>
   );
@@ -393,61 +432,75 @@ function DashboardInner() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12 animate-fade-in-up">
       {/* ── Header ── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Badge variant="neutral">Dashboard</Badge>
-          <CardTitle className="mt-3">{title}</CardTitle>
-          <CardDescription>Filter, search, and export updates with minimal effort.</CardDescription>
+          <Badge variant="brand">
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4 13h7V4H4v9zm9 7h7V11h-7v9zM4 20h7v-5H4v5zm9-9h7V4h-7v7z" />
+            </svg>
+            Dashboard
+          </Badge>
+          <CardTitle className="mt-3 text-[28px] sm:text-[32px]">
+            <span className="gradient-text">{title}</span>
+          </CardTitle>
+          <CardDescription className="max-w-xl">
+            Filter, search, and export updates with minimal effort. Everything you need, always up to date.
+          </CardDescription>
         </div>
-        <Button variant="secondary" onClick={() => download("updates.csv", toCsv(items))}>
+        <Button
+          variant="secondary"
+          onClick={() => download("updates.csv", toCsv(items))}
+          leftIcon={
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+            </svg>
+          }
+        >
           Export CSV
         </Button>
       </div>
 
       {/* ── Summary cards ── */}
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <Card className="shadow-sm">
-          <CardContent className="px-5 py-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-              </svg>
-              Total visible
-            </div>
-            <div className="mt-1 text-2xl font-bold text-slate-900">{total}</div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="px-5 py-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M3 9h18" />
-              </svg>
-              On this page
-            </div>
-            <div className="mt-1 text-2xl font-bold text-slate-900">{items.length}</div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="px-5 py-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              At Risk
-            </div>
-            <div className="mt-1 flex items-center gap-2">
-              <div className="text-2xl font-bold text-slate-900">{riskCount}</div>
-              {riskCount > 0 ? <Badge variant="danger">At Risk</Badge> : <Badge variant="success">OK</Badge>}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mt-7 grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Total visible"
+          value={total}
+          accent="from-indigo-500 to-violet-500"
+          icon={
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+            </svg>
+          }
+        />
+        <StatCard
+          label="On this page"
+          value={items.length}
+          accent="from-violet-500 to-fuchsia-500"
+          icon={
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18" />
+            </svg>
+          }
+        />
+        <StatCard
+          label="At Risk"
+          value={riskCount}
+          accent={riskCount > 0 ? "from-rose-500 to-orange-500" : "from-emerald-500 to-cyan-500"}
+          trailing={
+            riskCount > 0 ? <Badge variant="danger">Needs review</Badge> : <Badge variant="success">All clear</Badge>
+          }
+          icon={
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          }
+        />
       </div>
 
       {/* ── Filters ── */}
@@ -612,9 +665,9 @@ function DashboardInner() {
       </Card>
 
       {/* ── Data table ── */}
-      <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5">
+      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-[0_1px_3px_rgba(15,23,42,0.04),0_18px_40px_-22px_rgba(30,27,75,0.22)]">
         <table className="min-w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/80 backdrop-blur text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <thead className="sticky top-0 z-10 border-b border-slate-200/70 bg-slate-50/90 backdrop-blur text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-5 py-3.5">
                 <button type="button" onClick={() => toggleSort("createdAt")} className="inline-flex items-center hover:text-slate-900">

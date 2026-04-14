@@ -25,7 +25,15 @@ export function RequireAuth({
 
   if (!isReady || !user) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-10 text-sm text-slate-600">Loading…</div>
+      <div className="mx-auto flex max-w-4xl items-center justify-center px-4 py-24">
+        <div className="flex items-center gap-3 text-sm text-slate-500">
+          <span className="relative flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-indigo-500" />
+          </span>
+          <span className="font-medium">Loading your workspace…</span>
+        </div>
+      </div>
     );
   }
 

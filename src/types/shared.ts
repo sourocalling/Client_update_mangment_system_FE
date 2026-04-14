@@ -1,4 +1,4 @@
-export type Role = "DEV" | "TL" | "PM";
+export type Role = "DEV" | "TL" | "PM" | "AM";
 
 export type Project = {
   id: string;

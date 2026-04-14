@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AuthContext, type AuthState, type AuthUser } from "@/lib/auth";
+import { AuthContext, type AuthState, type AuthUser, type RegisterInput } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 
 const storageKey = "cums_access_token";
@@ -61,6 +61,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
     setUser(res.user);
   }, []);
 
+  const register = useCallback(async (input: RegisterInput) => {
+    const res = await apiFetch<{ accessToken: string; user: AuthUser }>("/api/auth/signup", {
+      method: "POST",
+      body: input
+    });
+    window.localStorage.setItem(storageKey, res.accessToken);
+    setTokenCookie(res.accessToken);
+    setAccessToken(res.accessToken);
+    setUser(res.user);
+  }, []);
+
   const logout = useCallback(() => {
     window.localStorage.removeItem(storageKey);
     clearTokenCookie();
@@ -74,9 +85,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       user,
       accessToken,
       login,
+      register,
       logout
     }),
-    [accessToken, isReady, login, logout, user]
+    [accessToken, isReady, login, register, logout, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
