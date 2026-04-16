@@ -58,6 +58,15 @@ export type GitlabBranch = {
   protected: boolean;
 };
 
+export type GitlabDiff = {
+  old_path: string;
+  new_path: string;
+  new_file: boolean;
+  renamed_file: boolean;
+  deleted_file: boolean;
+  diff: string;
+};
+
 function sanitizeToken(raw: string): string {
   return raw.replace(/\s+/g, "").replace(/[\u200B-\u200D\uFEFF]/g, "");
 }
@@ -145,10 +154,11 @@ async function fetchGitlabPage<T>(
   cleanToken: string,
   pathWithQuery: string,
   page: number,
-  signal?: AbortSignal
-): Promise<{ data: T[]; totalPages: number }> {
+  signal?: AbortSignal,
+  perPage = 100
+): Promise<{ data: T[]; totalPages: number; total: number }> {
   const sep = pathWithQuery.includes("?") ? "&" : "?";
-  const target = `${baseUrl}${pathWithQuery}${sep}page=${page}&per_page=100`;
+  const target = `${baseUrl}${pathWithQuery}${sep}page=${page}&per_page=${perPage}`;
 
   const doFetch = (mode: "private" | "bearer") =>
     fetch(target, {
@@ -191,7 +201,8 @@ async function fetchGitlabPage<T>(
   const data = (await res.json()) as T[];
   const totalHeader = res.headers.get("x-total-pages");
   const totalPages = Number(totalHeader ?? "1") || 1;
-  return { data, totalPages };
+  const total = Number(res.headers.get("x-total") ?? "0") || 0;
+  return { data, totalPages, total };
 }
 
 const GITLAB_MAX_PROJECT_PAGES = 20; // ~2,000 projects cap
@@ -221,6 +232,43 @@ export async function fetchGitlabProjects(
   return [...first.data, ...rest.flatMap((p) => p.data)];
 }
 
+export async function fetchGitlabProjectsPage(
+  url: string,
+  token: string,
+  options: {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    signal?: AbortSignal;
+  } = {}
+): Promise<{ data: GitlabProject[]; page: number; totalPages: number; total: number }> {
+  const base = normalizeGitlabUrl(url);
+  const cleanToken = sanitizeToken(token);
+  if (!cleanToken) throw new Error("invalid_token");
+
+  const page = options.page ?? 1;
+  const perPage = options.perPage ?? 20;
+
+  const params = new URLSearchParams({
+    membership: "true",
+    simple: "true",
+    order_by: "last_activity_at",
+    sort: "desc"
+  });
+  if (options.search?.trim()) params.set("search", options.search.trim());
+
+  const path = `/api/v4/projects?${params.toString()}`;
+  const result = await fetchGitlabPage<GitlabProject>(
+    base,
+    cleanToken,
+    path,
+    page,
+    options.signal,
+    perPage
+  );
+  return { data: result.data, page, totalPages: result.totalPages, total: result.total };
+}
+
 export async function fetchGitlabCommits(
   url: string,
   token: string,
@@ -244,6 +292,21 @@ export async function fetchGitlabCommits(
   const path = `/api/v4/projects/${projectId}/repository/commits?${params.toString()}`;
   const { data } = await fetchGitlabPage<GitlabCommit>(base, cleanToken, path, 1, signal);
   return data;
+}
+
+export function fetchGitlabCommitDiff(
+  url: string,
+  token: string,
+  projectId: number,
+  sha: string,
+  signal?: AbortSignal
+): Promise<GitlabDiff[]> {
+  return gitlabFetch<GitlabDiff[]>(
+    url,
+    token,
+    `/api/v4/projects/${projectId}/repository/commits/${encodeURIComponent(sha)}/diff?per_page=100`,
+    signal
+  );
 }
 
 export async function fetchGitlabBranches(

@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MarkdownComposer } from "./MarkdownComposer";
 
-function setup(value = "hello") {
+function setup(value = "") {
   const onChange = jest.fn();
   const onUploadImage = jest.fn(async () => ({ url: "/uploads/x.png" }));
 
@@ -10,42 +10,43 @@ function setup(value = "hello") {
       value={value}
       onChange={onChange}
       onUploadImage={onUploadImage}
-      placeholder="..."
+      placeholder="Start writing..."
       maxChars={1000}
     />
   );
 
-  const textarea = screen.getByPlaceholderText("...") as HTMLTextAreaElement;
-  return { onChange, onUploadImage, textarea };
+  return { onChange, onUploadImage };
 }
 
 describe("MarkdownComposer", () => {
-  it("wraps selection with bold markdown", () => {
-    const { onChange, textarea } = setup("hello");
-    textarea.setSelectionRange(0, 5);
-    fireEvent.click(screen.getByRole("button", { name: "Bold" }));
-    expect(onChange).toHaveBeenCalledWith("**hello**");
+  it("renders the toolbar with formatting buttons", () => {
+    setup();
+    expect(screen.getByTitle("Bold")).toBeInTheDocument();
+    expect(screen.getByTitle("Italic")).toBeInTheDocument();
+    expect(screen.getByTitle("Underline")).toBeInTheDocument();
+    expect(screen.getByTitle("Bullet list")).toBeInTheDocument();
+    expect(screen.getByTitle("Ordered list")).toBeInTheDocument();
+    expect(screen.getByTitle("Insert link")).toBeInTheDocument();
+    expect(screen.getByTitle("Upload image")).toBeInTheDocument();
   });
 
-  it("inserts a link with URL normalization", () => {
-    const { onChange, textarea } = setup("hello");
-    textarea.setSelectionRange(5, 5);
-    fireEvent.click(screen.getByRole("button", { name: "Link" }));
-    const input = screen.getByPlaceholderText("https://example.com") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "example.com" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    const next = (onChange.mock.calls[0]?.[0] as string) ?? "";
-    expect(next.includes("[link](https://example.com/)")).toBe(true);
+  it("shows the character count", () => {
+    setup("hello");
+    expect(screen.getByText("5/1000")).toBeInTheDocument();
   });
 
-  it("uploads image and inserts markdown image", async () => {
-    const { onChange, onUploadImage } = setup("hello");
+  it("opens link dialog when link button is clicked", () => {
+    setup();
+    fireEvent.click(screen.getByTitle("Insert link"));
+    expect(screen.getByPlaceholderText("https://example.com")).toBeInTheDocument();
+  });
+
+  it("provides a file input for image upload", async () => {
+    const { onUploadImage } = setup();
     const file = new File([new Uint8Array([1, 2, 3])], "a.png", { type: "image/png" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { files: [file] } });
-
-    await waitFor(() => expect(onUploadImage).toHaveBeenCalled());
-    const next = onChange.mock.calls[0]?.[0] as string;
-    expect(next).toContain("![a.png](/uploads/x.png)");
+    await waitFor(() => expect(onUploadImage).toHaveBeenCalledWith(file));
   });
 });

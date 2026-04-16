@@ -8,7 +8,6 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { apiFetch, apiUpload } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
-  fetchGitlabProjects,
   useGitlabConnection,
   type GitlabProject
 } from "@/lib/gitlab";
@@ -97,9 +96,8 @@ function Icon({ name, className }: { name: "sparkle" | "check" | "warn"; classNa
 function SubmitPageInner() {
   const { accessToken } = useAuth();
   const { connection: gitlab } = useGitlabConnection();
-  const [gitlabProjects, setGitlabProjects] = useState<GitlabProject[]>([]);
-  const [isLoadingGitlab, setIsLoadingGitlab] = useState(false);
-  const [gitlabError, setGitlabError] = useState<string | null>(null);
+  const [selectedGitlabProject, setSelectedGitlabProject] = useState<GitlabProject | null>(null);
+  const [gitlabMeta, setGitlabMeta] = useState<{ total: number; isLoading: boolean }>({ total: 0, isLoading: false });
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [enhanceState, setEnhanceState] = useState<{
     risk: boolean | null;
@@ -126,20 +124,18 @@ function SubmitPageInner() {
 
   const originalBody = useWatch({ control: form.control, name: "originalBody" }) ?? "";
   const blockersChecked = useWatch({ control: form.control, name: "blockers" });
-  const projectIdValue = useWatch({ control: form.control, name: "projectId" }) ?? "";
-
-  const selectedGitlabProject = useMemo(() => {
-    if (!projectIdValue.startsWith("gitlab:")) return null;
-    const id = Number(projectIdValue.slice("gitlab:".length));
-    if (!Number.isFinite(id)) return null;
-    return gitlabProjects.find((p) => p.id === id) ?? null;
-  }, [projectIdValue, gitlabProjects]);
-
   const insertGitlabCommits = useCallback(
     (markdown: string) => {
       const current = form.getValues("originalBody") ?? "";
       const next = current.trim().length > 0 ? `${current}\n\n${markdown}\n` : `${markdown}\n`;
       form.setValue("originalBody", next, { shouldDirty: true, shouldValidate: true });
+    },
+    [form]
+  );
+
+  const setGeneratedTitle = useCallback(
+    (title: string) => {
+      form.setValue("title", title, { shouldDirty: true, shouldValidate: true });
     },
     [form]
   );
@@ -176,26 +172,6 @@ function SubmitPageInner() {
     },
     [accessToken]
   );
-
-  useEffect(() => {
-    if (!gitlab) {
-      setGitlabProjects([]);
-      setGitlabError(null);
-      return;
-    }
-    const controller = new AbortController();
-    setIsLoadingGitlab(true);
-    setGitlabError(null);
-    fetchGitlabProjects(gitlab.url, gitlab.token, controller.signal)
-      .then((res) => setGitlabProjects(res))
-      .catch((e) => {
-        if (e instanceof Error && e.name === "AbortError") return;
-        setGitlabError(e instanceof Error ? e.message : "gitlab_error");
-        setGitlabProjects([]);
-      })
-      .finally(() => setIsLoadingGitlab(false));
-    return () => controller.abort();
-  }, [gitlab]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:py-12 animate-fade-in-up">
@@ -337,12 +313,14 @@ function SubmitPageInner() {
                 label="Project"
                 hint={
                   gitlab
-                    ? isLoadingGitlab
+                    ? gitlabMeta.isLoading
                       ? "Loading GitLab projects…"
-                      : `GitLab · ${gitlabProjects.length} project${gitlabProjects.length === 1 ? "" : "s"}`
+                      : gitlabMeta.total > 0
+                        ? `GitLab · ${gitlabMeta.total} project${gitlabMeta.total === 1 ? "" : "s"}`
+                        : "GitLab"
                     : "Connect GitLab to load your projects"
                 }
-                error={form.formState.errors.projectId?.message ?? gitlabError ?? undefined}
+                error={form.formState.errors.projectId?.message}
               >
                 <Controller
                   control={form.control}
@@ -351,12 +329,14 @@ function SubmitPageInner() {
                     <GitlabProjectPicker
                       value={field.value}
                       onChange={(v) => field.onChange(v)}
-                      projects={gitlabProjects}
-                      disabled={!gitlab || isLoadingGitlab}
-                      isLoading={isLoadingGitlab}
+                      gitlabUrl={gitlab?.url ?? ""}
+                      gitlabToken={gitlab?.token ?? ""}
+                      disabled={!gitlab}
                       placeholder={
                         gitlab ? "Select a GitLab project…" : "Connect GitLab to load projects…"
                       }
+                      onProjectChange={setSelectedGitlabProject}
+                      onMetaChange={setGitlabMeta}
                     />
                   )}
                 />
@@ -366,11 +346,12 @@ function SubmitPageInner() {
             {gitlab && selectedGitlabProject ? (
               <GitlabCommitsPicker
                 projectId={selectedGitlabProject.id}
-                projectName={selectedGitlabProject.name_with_namespace}
+                projectName={selectedGitlabProject.name}
                 gitlabUrl={gitlab.url}
                 gitlabToken={gitlab.token}
                 currentUserEmail={gitlab.user.email}
                 onInsert={insertGitlabCommits}
+                onSetTitle={setGeneratedTitle}
               />
             ) : null}
 

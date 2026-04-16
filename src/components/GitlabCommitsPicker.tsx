@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import {
   fetchGitlabBranches,
   fetchGitlabCommits,
+  fetchGitlabCommitDiff,
   type GitlabBranch,
   type GitlabCommit
 } from "@/lib/gitlab";
@@ -41,6 +42,19 @@ function humanDate(dateStr: string): string {
   });
 }
 
+function titleDate(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function shortProjectName(fullName: string): string {
+  return fullName.split("/").pop()?.trim() || fullName;
+}
+
 function buildCommitsMarkdown(date: string, commits: GitlabCommit[]): string {
   if (commits.length === 0) return "";
   const lines = commits.map((c) => {
@@ -56,7 +70,8 @@ export function GitlabCommitsPicker({
   gitlabUrl,
   gitlabToken,
   currentUserEmail,
-  onInsert
+  onInsert,
+  onSetTitle
 }: {
   projectId: number;
   projectName: string;
@@ -64,6 +79,7 @@ export function GitlabCommitsPicker({
   gitlabToken: string;
   currentUserEmail?: string;
   onInsert: (markdown: string) => void;
+  onSetTitle?: (title: string) => void;
 }) {
   const [date, setDate] = useState<string>(() => todayISODate());
   const [myOnly, setMyOnly] = useState(true);
@@ -73,6 +89,8 @@ export function GitlabCommitsPicker({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summarizeError, setSummarizeError] = useState<string | null>(null);
 
   // Load branches whenever the project changes
   useEffect(() => {
@@ -151,6 +169,78 @@ export function GitlabCommitsPicker({
     onInsert(md);
   }, [visibleCommits, selected, date, onInsert]);
 
+  const handleSummarize = useCallback(async () => {
+    const picked = visibleCommits.filter((c) => selected.has(c.id));
+    if (picked.length === 0) return;
+    setSummarizeError(null);
+    setIsSummarizing(true);
+    try {
+      // Fetch diffs for every selected commit in parallel
+      const diffs = await Promise.all(
+        picked.map((c) =>
+          fetchGitlabCommitDiff(gitlabUrl, gitlabToken, projectId, c.id).catch(() => [])
+        )
+      );
+
+      const commitsForAi = picked.map((c, i) => {
+        const joined = diffs[i]
+          ?.map((d) => {
+            const header = d.new_file
+              ? `// new file: ${d.new_path}`
+              : d.deleted_file
+                ? `// deleted file: ${d.old_path}`
+                : d.renamed_file
+                  ? `// renamed: ${d.old_path} -> ${d.new_path}`
+                  : `// file: ${d.new_path}`;
+            return `${header}\n${d.diff}`;
+          })
+          .join("\n\n") ?? "";
+        return { title: c.title, sha: c.short_id, diff: joined };
+      });
+
+      const res = await fetch("/api/summarize-commits", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ commits: commitsForAi })
+      });
+
+      if (!res.ok) {
+        let message = "summarize_failed";
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (typeof body.error === "string") message = body.error;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const { summary } = (await res.json()) as { summary: string };
+      const header = `### AI-generated summary · ${humanDate(date)}${branchRef ? ` · \`${branchRef}\`` : ""}`;
+      const footer = `_Based on ${picked.length} commit${picked.length === 1 ? "" : "s"}: ${picked
+        .map((c) => `\`${c.short_id}\``)
+        .join(", ")}_`;
+      onInsert(`${header}\n\n${summary}\n\n${footer}`);
+
+      if (onSetTitle) {
+        onSetTitle(`${shortProjectName(projectName)} | ${titleDate(date)}`);
+      }
+    } catch (e) {
+      setSummarizeError(e instanceof Error ? e.message : "summarize_failed");
+    } finally {
+      setIsSummarizing(false);
+    }
+  }, [
+    visibleCommits,
+    selected,
+    projectId,
+    gitlabUrl,
+    gitlabToken,
+    date,
+    branchRef,
+    onInsert,
+    onSetTitle,
+    projectName
+  ]);
+
   const errorText = !error
     ? null
     : error === "invalid_token"
@@ -162,6 +252,16 @@ export function GitlabCommitsPicker({
           : error.startsWith("gitlab: ")
             ? `GitLab says: ${error.slice("gitlab: ".length)}`
             : "Couldn't load commits. Try again.";
+
+  const summarizeErrorText = !summarizeError
+    ? null
+    : summarizeError === "ai_timeout"
+      ? "AI took too long to respond. Try fewer commits."
+      : summarizeError === "AI_API_KEY not configured"
+        ? "AI is not configured on the server. Contact an admin."
+        : summarizeError === "summarize_failed"
+          ? "AI couldn't summarize those commits. Try again."
+          : `Summarization error: ${summarizeError}`;
 
   const selectedCount = selected.size;
   const allVisibleSelected =
@@ -325,35 +425,68 @@ export function GitlabCommitsPicker({
       </div>
 
       {/* Footer */}
-      <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-[11px] text-slate-500">
-          {selectedCount > 0
-            ? `${selectedCount} commit${selectedCount === 1 ? "" : "s"} selected`
-            : "Pick commits to include in your update"}
-        </div>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={selectedCount === 0}
-          onClick={handleInsert}
-          leftIcon={
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+      <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 px-4 py-3">
+        {summarizeErrorText ? (
+          <div className="rounded-lg border border-rose-200/80 bg-rose-50/80 px-3 py-2 text-[11px] text-rose-800">
+            {summarizeErrorText}
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-[11px] text-slate-500">
+            {selectedCount > 0
+              ? `${selectedCount} commit${selectedCount === 1 ? "" : "s"} selected`
+              : "Pick commits to include in your update"}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={selectedCount === 0 || isSummarizing}
+              isLoading={isSummarizing}
+              onClick={() => {
+                void handleSummarize();
+              }}
+              leftIcon={
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M12 2l1.4 5.1L18 9l-4.6 1.9L12 16l-1.4-5.1L6 9l4.6-1.9L12 2z" />
+                  <path d="M19 13l.9 3.2L23 17l-3.1 1.3L19 22l-.9-3.7L15 17l3.1-.8L19 13z" />
+                </svg>
+              }
+              className="text-sky-700 hover:text-sky-800"
             >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          }
-        >
-          Insert {selectedCount > 0 ? `${selectedCount} ` : ""}into update
-        </Button>
+              Summarize with AI
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={selectedCount === 0}
+              onClick={handleInsert}
+              leftIcon={
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              }
+            >
+              Insert {selectedCount > 0 ? `${selectedCount} ` : ""}into update
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

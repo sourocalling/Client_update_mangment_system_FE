@@ -5,6 +5,9 @@ const createJestConfig = nextJest({ dir: "./" });
 export default createJestConfig({
   testEnvironment: "jest-environment-jsdom",
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
-  testMatch: ["<rootDir>/src/**/*.test.tsx", "<rootDir>/src/**/*.test.ts"]
+  testMatch: ["<rootDir>/src/**/*.test.tsx", "<rootDir>/src/**/*.test.ts"],
+  moduleNameMapper: {
+    "^marked$": "<rootDir>/node_modules/marked/lib/marked.umd.js"
+  }
 });
 
