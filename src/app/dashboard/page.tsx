@@ -178,7 +178,6 @@ function DashboardInner() {
         filters={data.filters}
         onFilterChange={data.setFilter}
         onClear={data.clearFilters}
-        projects={data.projects}
         authors={data.authors}
         error={data.error}
         page={data.page}

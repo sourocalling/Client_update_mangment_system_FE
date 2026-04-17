@@ -241,11 +241,23 @@ function SubmitPageInner() {
                 });
                 return;
               }
+              if (!selectedGitlabProject) {
+                form.setError("projectId", { message: "Pick a GitLab project." });
+                return;
+              }
               setSubmitSuccess(null);
+              const resolved = await apiFetch<{ id: string; name: string }>("/api/projects/ensure-gitlab", {
+                method: "POST",
+                token: accessToken,
+                body: {
+                  externalId: String(selectedGitlabProject.id),
+                  name: selectedGitlabProject.name
+                }
+              });
               const res = await apiFetch<{ id: string }>("/api/updates", {
                 method: "POST",
                 token: accessToken,
-                body: values
+                body: { ...values, projectId: resolved.id }
               });
               setSubmitSuccess(res.id);
               form.reset({ ...values, title: "", originalBody: "", nextPlan: "", blockers: false, hours: 0 });

@@ -1,19 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Field, InlineMessage } from "@/components/ui/Field";
 import { TextInput, Select } from "@/components/ui/Inputs";
 import { Button } from "@/components/ui/Button";
 import { GitlabProjectPicker } from "@/components/GitlabProjectPicker";
+import { GitlabConnectModal } from "@/components/GitlabConnectModal";
 import type { Filters } from "@/hooks/useUpdates";
-import type { Project } from "@/types/shared";
 import { cn } from "@/lib/cn";
 
 export function FilterPanel({
   filters,
   onFilterChange,
   onClear,
-  projects,
   authors,
   error,
   /* pagination */
@@ -31,7 +31,6 @@ export function FilterPanel({
   filters: Filters;
   onFilterChange: <K extends keyof Filters>(key: K, value: Filters[K]) => void;
   onClear: () => void;
-  projects: Project[];
   authors: [string, string][];
   error: string | null;
   page: number;
@@ -45,6 +44,7 @@ export function FilterPanel({
   gitlabToken: string;
 }) {
   const gitlabConnected = Boolean(gitlabUrl && gitlabToken);
+  const [isConnectOpen, setIsConnectOpen] = useState(false);
 
   return (
     <Card className="mt-5">
@@ -61,82 +61,72 @@ export function FilterPanel({
             </Field>
           </div>
 
-          {/* ── Project filter ──────────────────────────────── */}
-          <div className="md:col-span-3">
-            <Field
-              label="Project"
-              hint={gitlabConnected ? "GitLab" : undefined}
-            >
-              {gitlabConnected ? (
-                <div className="relative">
-                  <GitlabProjectPicker
-                    value={filters.projectId}
-                    onChange={(v) => onFilterChange("projectId", v)}
-                    gitlabUrl={gitlabUrl}
-                    gitlabToken={gitlabToken}
-                    placeholder="All projects"
-                  />
-                  {/* Clear button when a project is selected */}
-                  {filters.projectId ? (
-                    <button
-                      type="button"
-                      onClick={() => onFilterChange("projectId", "")}
-                      className="absolute right-9 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                      title="Clear project filter"
-                    >
-                      <svg
-                        className="h-3.5 w-3.5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
+          {gitlabConnected ? (
+            <>
+              {/* ── Project filter ──────────────────────────────── */}
+              <div className="md:col-span-3">
+                <Field label="Project" hint="GitLab">
+                  <div className="relative">
+                    <GitlabProjectPicker
+                      value={filters.projectId}
+                      onChange={(v) => onFilterChange("projectId", v)}
+                      gitlabUrl={gitlabUrl}
+                      gitlabToken={gitlabToken}
+                      placeholder="All projects"
+                    />
+                    {filters.projectId ? (
+                      <button
+                        type="button"
+                        onClick={() => onFilterChange("projectId", "")}
+                        className="absolute right-9 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        title="Clear project filter"
                       >
-                        <path d="M18 6 6 18M6 6l12 12" />
-                      </svg>
-                    </button>
-                  ) : null}
-                </div>
-              ) : (
-                <Select
-                  value={filters.projectId}
-                  onChange={(e) => onFilterChange("projectId", e.target.value)}
-                >
-                  <option value="">All</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
+                        <svg
+                          className="h-3.5 w-3.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                        >
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    ) : null}
+                  </div>
+                </Field>
+              </div>
 
-          {/* ── Author filter ──────────────────────────────── */}
-          <div className="md:col-span-3">
-            <Field
-              label="Author"
-              hint={
-                authors.length > 0
-                  ? `${authors.length} author${authors.length === 1 ? "" : "s"}`
-                  : undefined
-              }
-            >
-              <Select
-                value={filters.authorId}
-                onChange={(e) => onFilterChange("authorId", e.target.value)}
-                className={cn(!authors.length && "text-slate-400")}
-              >
-                <option value="">All authors</option>
-                {authors.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
+              {/* ── Author filter ──────────────────────────────── */}
+              <div className="md:col-span-3">
+                <Field
+                  label="Author"
+                  hint={
+                    authors.length > 0
+                      ? `${authors.length} author${authors.length === 1 ? "" : "s"}`
+                      : undefined
+                  }
+                >
+                  <Select
+                    value={filters.authorId}
+                    onChange={(e) => onFilterChange("authorId", e.target.value)}
+                    className={cn(!authors.length && "text-slate-400")}
+                  >
+                    <option value="">All authors</option>
+                    {authors.map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+            </>
+          ) : (
+            <div className="md:col-span-6">
+              <GitlabConnectPrompt onConnect={() => setIsConnectOpen(true)} />
+            </div>
+          )}
 
           <div className="md:col-span-2">
             <Field label="At Risk">
@@ -228,6 +218,62 @@ export function FilterPanel({
           </InlineMessage>
         ) : null}
       </CardContent>
+
+      <GitlabConnectModal
+        open={isConnectOpen}
+        onClose={() => setIsConnectOpen(false)}
+      />
     </Card>
+  );
+}
+
+function GitlabConnectPrompt({ onConnect }: { onConnect: () => void }) {
+  return (
+    <div className="flex h-full flex-col justify-between gap-3 rounded-xl border border-dashed border-sky-300/70 bg-gradient-to-br from-sky-50/70 via-white to-white px-4 py-3">
+      <div className="flex items-start gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-sky-200">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+            <path d="M12 21 3 12l2.3-7.1h3l2.4 7.1H13l2.4-7.1h3L20.9 12 12 21z" fill="#FC6D26" />
+            <path d="M12 21 8.7 12H15.3L12 21z" fill="#E24329" />
+            <path d="M12 21 3 12h5.7L12 21z" fill="#FCA326" />
+            <path d="m3 12 2.3-7.1L8.7 12H3z" fill="#E24329" />
+            <path d="M12 21 21 12h-5.7L12 21z" fill="#FCA326" />
+            <path d="m21 12-2.3-7.1L15.3 12H21z" fill="#E24329" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold text-slate-800">
+            Connect GitLab to filter by project & author
+          </div>
+          <div className="mt-0.5 text-[11px] leading-snug text-slate-500">
+            Your projects and their authors will load automatically once connected.
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          size="sm"
+          onClick={onConnect}
+          leftIcon={
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+          }
+        >
+          Connect GitLab
+        </Button>
+      </div>
+    </div>
   );
 }
