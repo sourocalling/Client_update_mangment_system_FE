@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { Field, InlineMessage } from "@/components/ui/Field";
@@ -40,8 +40,14 @@ export default function LoginPage() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(LoginSchema),
     defaultValues: { email: "dev1@acme.test", password: "password" },
-    mode: "onChange"
+    mode: "onChange",
+    reValidateMode: "onChange"
   });
+
+  // Validate defaults on mount so the submit button is enabled immediately
+  useEffect(() => {
+    form.trigger();
+  }, [form]);
 
   const fillDemo = (email: string) => {
     form.setValue("email", email, { shouldValidate: true });

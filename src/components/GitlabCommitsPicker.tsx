@@ -69,6 +69,7 @@ export function GitlabCommitsPicker({
   projectName,
   gitlabUrl,
   gitlabToken,
+  authToken,
   currentUserEmail,
   onInsert,
   onSetTitle
@@ -77,6 +78,7 @@ export function GitlabCommitsPicker({
   projectName: string;
   gitlabUrl: string;
   gitlabToken: string;
+  authToken?: string | null;
   currentUserEmail?: string;
   onInsert: (markdown: string) => void;
   onSetTitle?: (title: string) => void;
@@ -200,7 +202,10 @@ export function GitlabCommitsPicker({
 
       const res = await fetch("/api/summarize-commits", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(authToken ? { authorization: `Bearer ${authToken}` } : {})
+        },
         body: JSON.stringify({ commits: commitsForAi })
       });
 
@@ -234,6 +239,7 @@ export function GitlabCommitsPicker({
     projectId,
     gitlabUrl,
     gitlabToken,
+    authToken,
     date,
     branchRef,
     onInsert,

@@ -349,6 +349,7 @@ function SubmitPageInner() {
                 projectName={selectedGitlabProject.name}
                 gitlabUrl={gitlab.url}
                 gitlabToken={gitlab.token}
+                authToken={accessToken}
                 currentUserEmail={gitlab.user.email}
                 onInsert={insertGitlabCommits}
                 onSetTitle={setGeneratedTitle}

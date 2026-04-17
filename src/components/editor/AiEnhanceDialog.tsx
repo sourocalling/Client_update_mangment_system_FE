@@ -51,7 +51,10 @@ export function AiEnhanceDialog({
       try {
         const resp = await fetch("/api/enhance", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            ...(token ? { authorization: `Bearer ${token}` } : {})
+          },
           body: JSON.stringify({ body: requestBody, mode: requestMode }),
           signal: controller.signal
         });

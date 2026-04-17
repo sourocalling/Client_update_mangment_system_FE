@@ -1,13 +1,18 @@
 import type { NextRequest } from "next/server";
+import { requireAuth, rateLimitKey } from "@/lib/api-auth";
+import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import {
+  GROQ_API_URL,
+  GROQ_MODEL,
+  GROQ_MAX_RETRIES,
+  MAX_DIFF_CHARS_PER_COMMIT,
+  MAX_TOTAL_CHARS,
+  MAX_COMMITS,
+  AI_RATE_LIMIT,
+  AI_RATE_WINDOW_MS
+} from "@/lib/ai-config";
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
-const GROQ_TIMEOUT_MS = Number(process.env.GROQ_TIMEOUT_MS) || 30000;
-const GROQ_MAX_RETRIES = Number(process.env.GROQ_MAX_RETRIES) || 2;
-
-const MAX_DIFF_CHARS_PER_COMMIT = 3500;
-const MAX_TOTAL_CHARS = 60_000;
-const MAX_COMMITS = 25;
+const GROQ_TIMEOUT_MS = Number(process.env.GROQ_TIMEOUT_MS) || 30_000;
 
 const SYSTEM_PROMPT = `You are a technical writing assistant for developer daily standup updates.
 
@@ -31,7 +36,9 @@ function truncate(str: string, max: number): string {
 
 function buildUserPrompt(commits: CommitPayload[]): string {
   const lines: string[] = [];
-  lines.push(`Summarize the following ${commits.length} commit(s) as bullet points for a daily update:\n`);
+  lines.push(
+    `Summarize the following ${commits.length} commit(s) as bullet points for a daily update:\n`
+  );
 
   let running = 0;
   for (let i = 0; i < commits.length; i++) {
@@ -39,7 +46,9 @@ function buildUserPrompt(commits: CommitPayload[]): string {
     const diff = truncate(c.diff ?? "", MAX_DIFF_CHARS_PER_COMMIT);
     const block = `Commit ${i + 1}: ${c.title}\n---DIFF START---\n${diff}\n---DIFF END---\n`;
     if (running + block.length > MAX_TOTAL_CHARS) {
-      lines.push(`\n…[${commits.length - i} more commits omitted from prompt for brevity]…`);
+      lines.push(
+        `\n…[${commits.length - i} more commits omitted from prompt for brevity]…`
+      );
       break;
     }
     lines.push(block);
@@ -49,11 +58,25 @@ function buildUserPrompt(commits: CommitPayload[]): string {
 }
 
 export async function POST(request: NextRequest) {
+  // ── Auth check ──────────────────────────────────────────────
+  const auth = requireAuth(request);
+  if ("error" in auth) return auth.error;
+
+  // ── Rate limiting ───────────────────────────────────────────
+  const rlKey = rateLimitKey(request, "summarize");
+  const rl = rateLimit(rlKey, AI_RATE_LIMIT, AI_RATE_WINDOW_MS);
+  if (!rl.ok) return rateLimitResponse(rl);
+
+  // ── API key check ───────────────────────────────────────────
   const apiKey = process.env.AI_API_KEY;
   if (!apiKey) {
-    return Response.json({ error: "AI_API_KEY not configured" }, { status: 500 });
+    return Response.json(
+      { error: "AI_API_KEY not configured" },
+      { status: 500 }
+    );
   }
 
+  // ── Input validation ────────────────────────────────────────
   let body: { commits?: unknown };
   try {
     body = await request.json();
@@ -62,7 +85,10 @@ export async function POST(request: NextRequest) {
   }
 
   if (!Array.isArray(body.commits) || body.commits.length === 0) {
-    return Response.json({ error: "commits array required" }, { status: 400 });
+    return Response.json(
+      { error: "commits array required" },
+      { status: 400 }
+    );
   }
 
   const commits = (body.commits as unknown[])
@@ -70,10 +96,11 @@ export async function POST(request: NextRequest) {
     .map((c): CommitPayload | null => {
       if (!c || typeof c !== "object") return null;
       const rec = c as { title?: unknown; sha?: unknown; diff?: unknown };
-      if (typeof rec.title !== "string" || typeof rec.diff !== "string") return null;
+      if (typeof rec.title !== "string" || typeof rec.diff !== "string")
+        return null;
       return {
-        title: rec.title,
-        sha: typeof rec.sha === "string" ? rec.sha : "",
+        title: rec.title.slice(0, 500),
+        sha: typeof rec.sha === "string" ? rec.sha.slice(0, 50) : "",
         diff: rec.diff
       };
     })
@@ -83,6 +110,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "no valid commits" }, { status: 400 });
   }
 
+  // ── Groq API call ──────────────────────────────────────────
   const payload = JSON.stringify({
     model: GROQ_MODEL,
     messages: [
@@ -138,7 +166,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const isTimeout = lastError instanceof DOMException && lastError.name === "AbortError";
+  const isTimeout =
+    lastError instanceof DOMException && lastError.name === "AbortError";
   return Response.json(
     { error: isTimeout ? "ai_timeout" : "summarize_failed" },
     { status: isTimeout ? 504 : 502 }

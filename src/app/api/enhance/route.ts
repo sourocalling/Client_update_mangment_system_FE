@@ -1,9 +1,17 @@
 import type { NextRequest } from "next/server";
-
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
-const GROQ_TIMEOUT_MS = Number(process.env.GROQ_TIMEOUT_MS) || 15000;
-const GROQ_MAX_RETRIES = Number(process.env.GROQ_MAX_RETRIES) || 2;
+import { requireAuth, rateLimitKey } from "@/lib/api-auth";
+import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import {
+  GROQ_API_URL,
+  GROQ_MODEL,
+  GROQ_TIMEOUT_MS,
+  GROQ_MAX_RETRIES,
+  ENHANCE_MODES,
+  MAX_ENHANCE_BODY_CHARS,
+  AI_RATE_LIMIT,
+  AI_RATE_WINDOW_MS,
+  type EnhanceMode
+} from "@/lib/ai-config";
 
 const SYSTEM_PROMPT = `You are a writing assistant for developer daily standup updates.
 You will receive a developer's update text and a mode. Respond ONLY with valid JSON — no markdown fences, no explanation.
@@ -27,25 +35,48 @@ Respond with this exact JSON shape:
 }`;
 
 export async function POST(request: NextRequest) {
+  // ── Auth check ──────────────────────────────────────────────
+  const auth = requireAuth(request);
+  if ("error" in auth) return auth.error;
+
+  // ── Rate limiting ───────────────────────────────────────────
+  const rlKey = rateLimitKey(request, "enhance");
+  const rl = rateLimit(rlKey, AI_RATE_LIMIT, AI_RATE_WINDOW_MS);
+  if (!rl.ok) return rateLimitResponse(rl);
+
+  // ── API key check ───────────────────────────────────────────
   const apiKey = process.env.AI_API_KEY;
   if (!apiKey) {
     return Response.json({ error: "AI_API_KEY not configured" }, { status: 500 });
   }
 
-  let body: { body?: string; mode?: string };
+  // ── Input validation ────────────────────────────────────────
+  let body: { body?: unknown; mode?: unknown };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const text = body.body?.trim();
-  const mode = body.mode ?? "style";
-
-  if (!text) {
+  if (typeof body.body !== "string" || !body.body.trim()) {
     return Response.json({ error: "body is required" }, { status: 400 });
   }
 
+  const text = body.body.trim();
+
+  if (text.length > MAX_ENHANCE_BODY_CHARS) {
+    return Response.json(
+      { error: `body exceeds ${MAX_ENHANCE_BODY_CHARS} character limit` },
+      { status: 400 }
+    );
+  }
+
+  const mode: EnhanceMode =
+    typeof body.mode === "string" && ENHANCE_MODES.includes(body.mode as EnhanceMode)
+      ? (body.mode as EnhanceMode)
+      : "style";
+
+  // ── Groq API call ──────────────────────────────────────────
   const payload = JSON.stringify({
     model: GROQ_MODEL,
     messages: [
@@ -90,9 +121,11 @@ export async function POST(request: NextRequest) {
       return Response.json({
         enriched: parsed.enriched ?? text,
         risk: parsed.risk ?? false,
-        riskKeywords: parsed.riskKeywords ?? [],
+        riskKeywords: Array.isArray(parsed.riskKeywords) ? parsed.riskKeywords : [],
         inappropriate: parsed.inappropriate ?? false,
-        inappropriateKeywords: parsed.inappropriateKeywords ?? []
+        inappropriateKeywords: Array.isArray(parsed.inappropriateKeywords)
+          ? parsed.inappropriateKeywords
+          : []
       });
     } catch (e) {
       lastError = e;
